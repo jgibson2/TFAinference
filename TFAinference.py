@@ -1,18 +1,15 @@
 #!/usr/bin/python
 
-#learn TFA matrix values from 
+# learn TFA matrix values from
 #	symbolic TFA matrix, 
 #	CS matrix, 
 #	and measured log expression values
 
-import sys
 from gurobipy import *
+import numpy as np
 import time
-import random
-
-from TFAinferenceIO import *
 from TFAinferenceMatrixMath import *
-
+from TFAinferenceIO import *
 
 """
 Input:
@@ -26,79 +23,81 @@ Output:
 
 makes a least squares optimization problem for gurobi to optimize
 """
+
+
 def learnTFA(A, C, data, modelParams):
-  numGenes = len(data)
-  numSamples = len(data[0])
-  numTFs = len(C[0])-1
+    numGenes = len(data)
+    numSamples = len(data[0])
+    numTFs = len(C[0]) - 1
 
-  # currently none of these params relevant to learning TFA
-  # csFlag, lassoFlag, maFlag = modelParams
+    # currently none of these params relevant to learning TFA
+    # csFlag, lassoFlag, maFlag = modelParams
 
-  print "learning activity values"
+    print("learning activity values")
 
-  # initialize gurobi model
-  model = Model()
-  model.setParam('OutputFlag', False)
+    # initialize gurobi model
+    model = Model()
+    model.setParam('OutputFlag', False)
 
-  # Add tfa variables to the model
-  varsMatrix = []   # holds the activity matrix, with pointers to coeff where relevant
-  for i in range(numTFs):
-    constraintCounter = 0   # counts the number of coeff in a row
-    varsMatrix.append([])   # start a new row in the activity matrix
-    constraint = LinExpr()    # initialize the constraint that each row's avg coeff value is 1
-    for j in range(numSamples):
-      if A[i][j]==0:
-        varsMatrix[i].append(0)
-      else:
-        # currently does not allow learning of 0 for activity values
-        v = model.addVar(lb=0.0001, vtype=GRB.CONTINUOUS, name='A['+str(i)+','+str(j)+']')
-        varsMatrix[i].append(v)
-        constraint += v
-        constraintCounter += 1
-    # add the scaling constraint
-    model.addConstr(constraint/constraintCounter, GRB.EQUAL, 1.0, "c"+str(i))
+    # Add tfa variables to the model
+    varsMatrix = []  # holds the activity matrix, with pointers to coeff where relevant
+    for i in range(numTFs):
+        constraintCounter = 0  # counts the number of coeff in a row
+        varsMatrix.append([])  # start a new row in the activity matrix
+        constraint = LinExpr()  # initialize the constraint that each row's avg coeff value is 1
+        for j in range(numSamples):
+            if A[i][j] == 0:
+                varsMatrix[i].append(0)
+            else:
+                # currently does not allow learning of 0 for activity values
+                v = model.addVar(lb=0.0001, vtype=GRB.CONTINUOUS, name='A[' + str(i) + ',' + str(j) + ']')
+                varsMatrix[i].append(v)
+                constraint += v
+                constraintCounter += 1
+        # add the scaling constraint
+        model.addConstr(constraint / constraintCounter, GRB.EQUAL, 1.0, "c" + str(i))
+        model.update()
+
+    # Populate objective
+    obj = QuadExpr()
+    for i in range(numGenes):
+        for j in range(numSamples):
+            geneExpr = LinExpr()
+            geneExpr += C[i][numTFs]
+            for k in range(numTFs):
+                if type(varsMatrix[k][j]) == Var:
+                    geneExpr += C[i][k] * varsMatrix[k][j]
+            geneError = data[i][j] - geneExpr
+            obj += geneError * geneError
+
+    model.setObjective(obj)
     model.update()
 
-  # Populate objective
-  obj = QuadExpr()
-  for i in range(numGenes):
-    for j in range(numSamples):
-      geneExpr = LinExpr()
-      geneExpr += C[i][numTFs]
-      for k in range(numTFs):
-        if type(varsMatrix[k][j])==Var:
-          geneExpr += C[i][k]*varsMatrix[k][j]
-      geneError = data[i][j] - geneExpr
-      obj += geneError * geneError
+    # Solve
+    try:
+        model.optimize()
+    except:
+        return False
 
-  model.setObjective(obj)
-  model.update()
+    # Write model to a file
+    # model.write('learnTFA.lp')
 
-  # Solve
-  try:
-  	model.optimize()
-  except:
-  	return False
+    # check that optimization succeeded
+    if model.status != GRB.Status.OPTIMAL:
+        return False
 
-  # Write model to a file
-  # model.write('learnTFA.lp')
+    # convert back to matrix
+    Atemp = []
+    for i in range(numTFs):
+        Atemp.append([])
+        for j in range(numSamples):
+            if A[i][j] == 0:
+                Atemp[i].append(0)
+            else:
+                Atemp[i].append(model.getAttr('x', [varsMatrix[i][j]])[0])
+    Atemp.append([1] * numSamples)
 
-  # check that optimization succeeded
-  if model.status != GRB.Status.OPTIMAL:
-    return False
-
-  #convert back to matrix
-  Atemp = []
-  for i in range(numTFs):
-    Atemp.append([])
-    for j in range(numSamples):
-      if A[i][j] == 0:
-        Atemp[i].append(0)
-      else:
-        Atemp[i].append(model.getAttr('x', [varsMatrix[i][j]])[0])
-  Atemp.append([1]*numSamples)
-
-  return Atemp
+    return Atemp
 
 
 """
@@ -113,95 +112,103 @@ Output:
 
 makes a least squares optimization problem for gurobi to optimize
 """
+
+
 def learnCS(A, C, data, modelParams):
-  numGenes = len(data)
-  numSamples = len(data[0])
-  numTFs = len(C[0])
+    numGenes = len(data)
+    numSamples = len(data[0])
+    numTFs = len(C[0])
 
-  csFlag, lassoWall, maFlag = modelParams
+    csFlag, lassoWall, maFlag = modelParams
 
-  print "learning CS with", numGenes, "genes,", numSamples, "samples,", numTFs, "TFs"
+    print("learning CS with", numGenes, "genes,", numSamples, "samples,", numTFs, "TFs")
 
-  # Initialize the model
-  model = Model()
-  model.setParam('OutputFlag', False)
-  
-  # Add cs variables to the model
-  varsMatrix = []   # holds the cs matrix, with pointers to coeff where relevant
-  lassoConstraint = LinExpr()   # Intialize the LASSO constraint
-  for i in range(numGenes):
-    varsMatrix.append([])   # add a row to the cs matrix
-    for j in range(numTFs+1):
-      if j==numTFs: #learning baseline expression
-        if maFlag:
-          v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-        else:
-          v = model.addVar(lb=0.0001, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-        varsMatrix[i].append(v)
-      else: #learning an influence between a TF and gene
-        if C[i][j]==0:  #no influence
-          varsMatrix[i].append(0)
-        elif C[i][j] > 0: #an influence to be learned, activating
-          if csFlag:
-            v = model.addVar(lb=0.0001, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-          else:
-              v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-          varsMatrix[i].append(v)
-          v2 = model.addVar()
-          model.addGenConstrAbs(v2, v, "absconstr"+str(i)+"-"+str(j))
-          lassoConstraint += v2
-        else: #an influence to be learned, repressing
-          if csFlag:
-            v = model.addVar(lb=-GRB.INFINITY, ub=-0.0001, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-          else:
-            v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-          varsMatrix[i].append(v)
-          v2 = model.addVar()
-          model.addGenConstrAbs(v2, v, "absconstr"+str(i)+"-"+str(j))
-          lassoConstraint += v2
-  if lassoWall:
-    model.addConstr(lassoConstraint <= lassoWall, "lasso")
-  model.update()
+    # Initialize the model
+    model = Model()
+    model.setParam('OutputFlag', False)
 
-  # Populate objective
-  obj = QuadExpr()
-  for i in range(numGenes):
-    for j in range(numSamples):
-      geneExpr = LinExpr()
-      geneExpr += varsMatrix[i][numTFs]
-      for k in range(numTFs):
-        if type(varsMatrix[i][k])==Var:
-          geneExpr += varsMatrix[i][k]*A[k][j]
-      geneError = data[i][j] - geneExpr
-      obj += geneError * geneError
+    # Add cs variables to the model
+    varsMatrix = []  # holds the cs matrix, with pointers to coeff where relevant
+    lassoConstraint = LinExpr()  # Intialize the LASSO constraint
+    for i in range(numGenes):
+        varsMatrix.append([])  # add a row to the cs matrix
+        for j in range(numTFs + 1):
+            if j == numTFs:  # learning baseline expression
+                if maFlag:
+                    v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                     name='C[' + str(i) + ',' + str(j) + ']')
+                else:
+                    v = model.addVar(lb=0.0001, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                     name='C[' + str(i) + ',' + str(j) + ']')
+                varsMatrix[i].append(v)
+            else:  # learning an influence between a TF and gene
+                if C[i][j] == 0:  # no influence
+                    varsMatrix[i].append(0)
+                elif C[i][j] > 0:  # an influence to be learned, activating
+                    if csFlag:
+                        v = model.addVar(lb=0.0001, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                         name='C[' + str(i) + ',' + str(j) + ']')
+                    else:
+                        v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                         name='C[' + str(i) + ',' + str(j) + ']')
+                    varsMatrix[i].append(v)
+                    v2 = model.addVar()
+                    model.addGenConstrAbs(v2, v, "absconstr" + str(i) + "-" + str(j))
+                    lassoConstraint += v2
+                else:  # an influence to be learned, repressing
+                    if csFlag:
+                        v = model.addVar(lb=-GRB.INFINITY, ub=-0.0001, vtype=GRB.CONTINUOUS,
+                                         name='C[' + str(i) + ',' + str(j) + ']')
+                    else:
+                        v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                         name='C[' + str(i) + ',' + str(j) + ']')
+                    varsMatrix[i].append(v)
+                    v2 = model.addVar()
+                    model.addGenConstrAbs(v2, v, "absconstr" + str(i) + "-" + str(j))
+                    lassoConstraint += v2
+    if lassoWall:
+        model.addConstr(lassoConstraint <= lassoWall, "lasso")
+    model.update()
 
-  model.setObjective(obj)
-  model.update()
+    # Populate objective
+    obj = QuadExpr()
+    for i in range(numGenes):
+        for j in range(numSamples):
+            geneExpr = LinExpr()
+            geneExpr += varsMatrix[i][numTFs]
+            for k in range(numTFs):
+                if type(varsMatrix[i][k]) == Var:
+                    geneExpr += varsMatrix[i][k] * A[k][j]
+            geneError = data[i][j] - geneExpr
+            obj += geneError * geneError
 
-  # Solve
-  try:
-    model.optimize()
-  except:
-    return False
+    model.setObjective(obj)
+    model.update()
 
-  # Write model to a file
-  # model.write('learnCS.lp')
+    # Solve
+    try:
+        model.optimize()
+    except:
+        return False
 
-  # check that optimization succeeded
-  if model.status != GRB.Status.OPTIMAL:
-    return False
+    # Write model to a file
+    # model.write('learnCS.lp')
 
-  #convert back to matrix
-  Ctemp = []
-  for i in range(numGenes):
-    Ctemp.append([])
-    for j in range(numTFs+1):
-      if j<numTFs and C[i][j] == 0:
-        Ctemp[i].append(0)
-      else:
-        Ctemp[i].append(model.getAttr('x', [varsMatrix[i][j]])[0])
-    
-  return Ctemp
+    # check that optimization succeeded
+    if model.status != GRB.Status.OPTIMAL:
+        return False
+
+    # convert back to matrix
+    Ctemp = []
+    for i in range(numGenes):
+        Ctemp.append([])
+        for j in range(numTFs + 1):
+            if j < numTFs and C[i][j] == 0:
+                Ctemp[i].append(0)
+            else:
+                Ctemp[i].append(model.getAttr('x', [varsMatrix[i][j]])[0])
+
+    return Ctemp
 
 
 """
@@ -216,73 +223,77 @@ Output:
 
 makes a least squares optimization problem for gurobi to optimize
 """
+
+
 def learnCSValidation(A, C, data, modelParams):
-  numGenes = len(data)
-  numSamples = len(data[0])
-  numTFs = len(C[0])-1
+    numGenes = len(data)
+    numSamples = len(data[0])
+    numTFs = len(C[0]) - 1
 
-  csFlag, lassoWall, maFlag = modelParams
+    csFlag, lassoWall, maFlag = modelParams
 
-  print "learning CS with", numGenes, "genes,", numSamples, "samples,", numTFs, "TFs"
+    print("learning CS with", numGenes, "genes,", numSamples, "samples,", numTFs, "TFs")
 
-  # Initialize the model
-  model = Model()
-  model.setParam('OutputFlag', False)
-  
-  # Add cs variables to the model
-  varsMatrix = []
-  for i in range(numGenes):
-    varsMatrix.append([])
-    for j in range(numTFs+1):
-      if j==numTFs: #learning baseline expression
-        if maFlag:
-          v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-        else:
-          v = model.addVar(lb=0.0001, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name='C['+str(i)+','+str(j)+']')
-        varsMatrix[i].append(v)
-      else: #learning an influence between a TF and gene
-          varsMatrix[i].append(C[i][j])
-  model.update()
+    # Initialize the model
+    model = Model()
+    model.setParam('OutputFlag', False)
 
-  # Populate objective
-  obj = QuadExpr()
-  for i in range(numGenes):
-    for j in range(numSamples):
-      geneExpr = LinExpr()
-      geneExpr += varsMatrix[i][numTFs]
-      for k in range(numTFs):
-        if type(varsMatrix[i][k])==Var:
-          geneExpr += varsMatrix[i][k]*A[k][j]
-      geneError = data[i][j] - geneExpr
-      obj += geneError * geneError
+    # Add cs variables to the model
+    varsMatrix = []
+    for i in range(numGenes):
+        varsMatrix.append([])
+        for j in range(numTFs + 1):
+            if j == numTFs:  # learning baseline expression
+                if maFlag:
+                    v = model.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                     name='C[' + str(i) + ',' + str(j) + ']')
+                else:
+                    v = model.addVar(lb=0.0001, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                     name='C[' + str(i) + ',' + str(j) + ']')
+                varsMatrix[i].append(v)
+            else:  # learning an influence between a TF and gene
+                varsMatrix[i].append(C[i][j])
+    model.update()
 
-  model.setObjective(obj)
-  model.update()
+    # Populate objective
+    obj = QuadExpr()
+    for i in range(numGenes):
+        for j in range(numSamples):
+            geneExpr = LinExpr()
+            geneExpr += varsMatrix[i][numTFs]
+            for k in range(numTFs):
+                if type(varsMatrix[i][k]) == Var:
+                    geneExpr += varsMatrix[i][k] * A[k][j]
+            geneError = data[i][j] - geneExpr
+            obj += geneError * geneError
 
-  # Solve
-  try:
-    model.optimize()
-  except:
-    return False
+    model.setObjective(obj)
+    model.update()
 
-  # Write model to a file
-  # model.write('learnCS.lp')
+    # Solve
+    try:
+        model.optimize()
+    except:
+        return False
 
-  # check that optimization succeeded
-  if model.status != GRB.Status.OPTIMAL:
-    return False
+    # Write model to a file
+    # model.write('learnCS.lp')
 
-  #convert back to matrix
-  Ctemp = []
-  for i in range(numGenes):
-    Ctemp.append([])
-    for j in range(numTFs+1):
-      if j<numTFs:
-        Ctemp[i].append(C[i][j])
-      else:
-        Ctemp[i].append(model.getAttr('x', [varsMatrix[i][j]])[0])
-    
-  return Ctemp
+    # check that optimization succeeded
+    if model.status != GRB.Status.OPTIMAL:
+        return False
+
+    # convert back to matrix
+    Ctemp = []
+    for i in range(numGenes):
+        Ctemp.append([])
+        for j in range(numTFs + 1):
+            if j < numTFs:
+                Ctemp[i].append(C[i][j])
+            else:
+                Ctemp[i].append(model.getAttr('x', [varsMatrix[i][j]])[0])
+
+    return Ctemp
 
 
 """
@@ -296,132 +307,140 @@ Output:
 
 Executes whole process of TFA inference learning
 """
+
+
 def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
-  startFile, csFile, tfaFile, dataFile = inputFiles
-  csFlag, lassoFlag, maFlag = modelParams
-  
-  # Put model data into matrices and lists
-  # this function is in TFAinferenceIO.py
-  A = readMatrixFromFile(tfaFile)
-  C = readMatrixFromFile(csFile)
-  Ctemp = readMatrixFromFile(startFile)
-  data = readMatrixFromFile(dataFile)
+    startFile, csFile, tfaFile, dataFile = inputFiles
+    csFlag, lassoFlag, maFlag = modelParams
 
-  numGenes = len(data)
-  numSamples = len(data[0])
-  numTFs = len(A)
-  
-  cProgression = []
-  aProgression = []
-  if lassoFlag:
-    # sample splits for 10 fold cross validation
-    trainColsList, testColsList = cvSampleSplits(numSamples, 10)
-  
-  start = time.time()
+    # Put model data into matrices and lists
+    # this function is in TFAinferenceIO.py
+    A = readMatrixFromFile(tfaFile)
+    Atemp = A
+    C = readMatrixFromFile(csFile)
+    Ctemp = readMatrixFromFile(startFile)
+    data = readMatrixFromFile(dataFile)
+    var = 0
 
-  for iter in range(numIterations):
-  
-    print "\niteration ", iter, "\n"
-  
-    Atemp = learnTFA(A, Ctemp, data, [])
-    if Atemp == False:
-      print "Could not learn the activity matrix"
-      return
+    numGenes = len(data)
+    numSamples = len(data[0])
+    numTFs = len(A)
 
-    Ctemp = learnCS(Atemp, C, data, [csFlag, 0, maFlag])
-      
-    if Ctemp == False:
-      print "Could not learn the control strength"
-      return
-
+    cProgression = []
+    aProgression = []
     if lassoFlag:
-      lassoLog = open("logFiles/lassoLog"+fileLabel+".tsv", 'a')
-      # calculate lasso constraint upper bound as sum of abs coeff, except baseline values
-      coeffSum = 0
-      for i in range(len(Ctemp)):
-        coeffSum += sum([abs(x) for x in Ctemp[i]])
-        coeffSum -= abs(Ctemp[i][-1])
-      lassoLog.write(str(round(coeffSum, 3))+"\t")
-      trainA, testA, trainData, testData = cvSamplingMatrices(Atemp, data, trainColsList, testColsList)
+        # sample splits for 10 fold cross validation
+        trainColsList, testColsList = cvSampleSplits(numSamples, 10)
 
-      bestParam = 10
-      bestError = float('inf')
-      for param in range(1,11):
-        errorList = []
-        trainErrorList = []
-        testDataCompilation = []
-        realDataCompilation = []
-        for cross in range(10):
-          print "param", param, "cross", cross
-          Ctest = learnCS(trainA[cross], C, trainData[cross], [csFlag, param*0.1*coeffSum, maFlag])
-          if Ctest != False:
-            validationData = matrixMultiply(Ctest, testA[cross])
-            var, l2 = calcError(testData[cross], validationData, False)
-            errorList.append(l2)
-            var, l2 = calcError(trainData[cross], matrixMultiply(Ctest, trainA[cross]), False)
-            trainErrorList.append(l2)
-            for row in map(list, zip(*validationData)):
-              testDataCompilation.append(row)
-            for row in map(list, zip(*testData[cross])):
-              realDataCompilation.append(row)
-          else:
-            lassoLog.write("could not learn with param "+str(param)+" on fold "+str(cross)+"\t")
-        if sum(errorList)/len(errorList) < bestError:
-          bestParam = param
-          bestError = sum(errorList)/len(errorList)
-        # log the results of testing this param
-        lassoLog.write(str(param)+"\t")   # param
-        # list of validation errors
-        lassoLog.write("{")   
-        for x in errorList:
-          lassoLog.write(str(round(x,3))+", ")
-        lassoLog.write("}\t")
-        lassoLog.write(str(round(sum(errorList)/len(errorList), 3))+"\t") # avg validation error
-        #list of training errors
-        lassoLog.write("{")   
-        for x in trainErrorList:
-          lassoLog.write(str(round(x,3))+", ")
-        lassoLog.write("}\t")
-        lassoLog.write(str(round(sum(trainErrorList)/len(trainErrorList), 3))+"\t") # avg training error
-        testVar, testL2 = calcError(map(list, zip(*realDataCompilation)), map(list, zip(*testDataCompilation)), False)
-        lassoLog.write(str(round(testVar,3))+"\t")  # var explained over all test results
+    start = time.time()
 
-      lassoLog.write(str(bestParam)+"\t") #best param
-      lassoLog.write(str(round(bestError, 3))+"\t") #best avg validation error
-      # learn CS with lasso constraint
-      Ctemp = learnCS(Atemp, C, data, [csFlag, bestParam*0.1*coeffSum, maFlag])
-      if Ctemp == False:
-        print "Could not learn the control strength"
-        return
-      var, l2 = calcError(data, matrixMultiply(Ctemp, Atemp), False)
-      lassoLog.write(str(round(l2,3))+"\n")   # error over all data
-      lassoLog.close()
+    for iter in range(numIterations):
 
-    aProgression.append(Atemp)
-    cProgression.append(Ctemp) 
+        print("\niteration ", iter, "\n")
 
-    currentVarExplained, currentError = calcError(data, matrixMultiply(Ctemp, Atemp), True)
-    # log the results every 10 iterations
-    if iter%10 == 0:
-      saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog"+fileLabel+".csv", "logFiles/tfaLog"+fileLabel+".csv", "logFiles/varExplainedLog"+fileLabel+".csv")
-  
-  end = time.time()
-  
-  print "\n\n\n"
-  print "done learning, now review:"
-  
-  for iteration in range(numIterations):
-    C = cProgression[iteration]
-    A = aProgression[iteration]
-    print "iteration ", iteration
-    dataTemp = matrixMultiply(C,A)
-    var, l2 = calcError(data, dataTemp, True)
-  
-  print "total run time (secs): ", end-start
-  
-  saveResults(Ctemp, Atemp, var, "results/learnedCS"+fileLabel+".csv", "results/learnedTFA"+fileLabel+".csv", "results/learnedVarExplained"+fileLabel+".csv")
+        Atemp = learnTFA(A, Ctemp, data, [])
+        if Atemp == False:
+            print("Could not learn the activity matrix")
+            return
 
-  return var
+        Ctemp = learnCS(Atemp, C, data, [csFlag, 0, maFlag])
+
+        if Ctemp == False:
+            print("Could not learn the control strength")
+            return
+
+        if lassoFlag:
+            lassoLog = open("logFiles/lassoLog" + fileLabel + ".tsv", 'a')
+            # calculate lasso constraint upper bound as sum of abs coeff, except baseline values
+            coeffSum = 0
+            for i in range(len(Ctemp)):
+                coeffSum += sum([abs(x) for x in Ctemp[i]])
+                coeffSum -= abs(Ctemp[i][-1])
+            lassoLog.write(str(round(coeffSum, 3)) + "\t")
+            trainA, testA, trainData, testData = cvSamplingMatrices(Atemp, data, trainColsList, testColsList)
+
+            bestParam = 10
+            bestError = float('inf')
+            for param in range(1, 11):
+                errorList = []
+                trainErrorList = []
+                testDataCompilation = []
+                realDataCompilation = []
+                for cross in range(10):
+                    print("param", param, "cross", cross)
+                    Ctest = learnCS(trainA[cross], C, trainData[cross], [csFlag, param * 0.1 * coeffSum, maFlag])
+                    if Ctest != False:
+                        validationData = np.multiply(Ctest, testA[cross])
+                        var, l2 = calcError(testData[cross], validationData, False)
+                        errorList.append(l2)
+                        var, l2 = calcError(trainData[cross], np.multiply(Ctest, trainA[cross]), False)
+                        trainErrorList.append(l2)
+                        for row in map(list, zip(*validationData)):
+                            testDataCompilation.append(row)
+                        for row in map(list, zip(*testData[cross])):
+                            realDataCompilation.append(row)
+                    else:
+                        lassoLog.write("could not learn with param " + str(param) + " on fold " + str(cross) + "\t")
+                if sum(errorList) / len(errorList) < bestError:
+                    bestParam = param
+                    bestError = sum(errorList) / len(errorList)
+                # log the results of testing this param
+                lassoLog.write(str(param) + "\t")  # param
+                # list of validation errors
+                lassoLog.write("{")
+                for x in errorList:
+                    lassoLog.write(str(round(x, 3)) + ", ")
+                lassoLog.write("}\t")
+                lassoLog.write(str(round(sum(errorList) / len(errorList), 3)) + "\t")  # avg validation error
+                # list of training errors
+                lassoLog.write("{")
+                for x in trainErrorList:
+                    lassoLog.write(str(round(x, 3)) + ", ")
+                lassoLog.write("}\t")
+                lassoLog.write(str(round(sum(trainErrorList) / len(trainErrorList), 3)) + "\t")  # avg training error
+                testVar, testL2 = calcError(map(list, zip(*realDataCompilation)), map(list, zip(*testDataCompilation)),
+                                            False)
+                lassoLog.write(str(round(testVar, 3)) + "\t")  # var explained over all test results
+
+            lassoLog.write(str(bestParam) + "\t")  # best param
+            lassoLog.write(str(round(bestError, 3)) + "\t")  # best avg validation error
+            # learn CS with lasso constraint
+            Ctemp = learnCS(Atemp, C, data, [csFlag, bestParam * 0.1 * coeffSum, maFlag])
+            if Ctemp == False:
+                print("Could not learn the control strength")
+                return
+            var, l2 = calcError(data, np.multiply(Ctemp, Atemp), False)
+            lassoLog.write(str(round(l2, 3)) + "\n")  # error over all data
+            lassoLog.close()
+
+        aProgression.append(Atemp)
+        cProgression.append(Ctemp)
+
+        currentVarExplained, currentError = calcError(data, np.multiply(Ctemp, Atemp), True)
+        # log the results every 10 iterations
+        if iter % 10 == 0:
+            saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog" + fileLabel + ".csv",
+                        "logFiles/tfaLog" + fileLabel + ".csv", "logFiles/varExplainedLog" + fileLabel + ".csv")
+
+    end = time.time()
+
+    print("\n\n\n")
+    print("done learning, now review:")
+
+    for iteration in range(numIterations):
+        C = cProgression[iteration]
+        A = aProgression[iteration]
+        print("iteration ", iteration)
+        dataTemp = np.multiply(C, A)
+        var, l2 = calcError(data, dataTemp, True)
+
+    print("total run time (secs): ", end - start)
+
+    saveResults(Ctemp, Atemp, var, "results/learnedCS" + fileLabel + ".csv", "results/learnedTFA" + fileLabel + ".csv",
+                "results/learnedVarExplained" + fileLabel + ".csv")
+
+    return var
+
 
 """
 Input:
@@ -431,28 +450,31 @@ Output:
 
 generates randomized partitionings of samples across needed folds
 """
+
+
 def cvSampleSplits(numSamples, folds):
-  train = []
-  test = []
-  if numSamples < folds:
-    print "not enough samples to do", folds, "fold cross validation"
-    for i in range(folds):
-      testCol = random.choice(range(numSamples))
-      trainCols = [x for x in range(numSamples) if x != testCol]
-      test.append([testCol])
-      train.append(trainCols)
-  else:
-    unsampled = range(numSamples)
-    for i in range(folds):
-      testCols = random.sample(unsampled, len(unsampled)/(folds-i))
-      #print "test", testCols
-      trainCols = [x for x in range(numSamples) if x not in testCols]
-      #print "train", trainCols
-      unsampled = [x for x in unsampled if x not in testCols]
-      #print "unsampled", unsampled
-      train.append(trainCols)
-      test.append(testCols)
-  return [train, test]
+    train = []
+    test = []
+    if numSamples < folds:
+        print("not enough samples to do", folds, "fold cross validation")
+        for i in range(folds):
+            testCol = random.choice(range(numSamples))
+            trainCols = [x for x in range(numSamples) if x != testCol]
+            test.append([testCol])
+            train.append(trainCols)
+    else:
+        unsampled = range(numSamples)
+        for i in range(folds):
+            testCols = random.sample(unsampled, len(unsampled) / (folds - i))
+            # print("test", testCols)
+            trainCols = [x for x in range(numSamples) if x not in testCols]
+            # print("train", trainCols)
+            unsampled = [x for x in unsampled if x not in testCols]
+            # print("unsampled", unsampled)
+            train.append(trainCols)
+            test.append(testCols)
+    return [train, test]
+
 
 """
 Input:
@@ -464,21 +486,24 @@ Output:
 uses the column indices (these should be output from the cvSampleSplits function)
 to make training and testing matrices
 """
+
+
 def cvSamplingMatrices(Amatrix, dataMatrix, trainColsList, testColsList):
-  trainA = []
-  testA = []
-  trainData = []
-  testData = []
-  for i in range(len(trainColsList)):
-      testCols = testColsList[i]
-      #print "test", testCols
-      trainCols = trainColsList[i]
-      #print "train", trainCols
-      trainA.append(grabColumns(Amatrix, trainCols))
-      testA.append(grabColumns(Amatrix, testCols))
-      trainData.append(grabColumns(dataMatrix, trainCols))
-      testData.append(grabColumns(dataMatrix, testCols))
-  return [trainA, testA, trainData, testData]
+    trainA = []
+    testA = []
+    trainData = []
+    testData = []
+    for i in range(len(trainColsList)):
+        testCols = testColsList[i]
+        # print("test", testCols)
+        trainCols = trainColsList[i]
+        # print("train", trainCols)
+        trainA.append(grabColumns(Amatrix, trainCols))
+        testA.append(grabColumns(Amatrix, testCols))
+        trainData.append(grabColumns(dataMatrix, trainCols))
+        testData.append(grabColumns(dataMatrix, testCols))
+    return [trainA, testA, trainData, testData]
+
 
 """
 Input:
@@ -490,15 +515,17 @@ Output:
 Returns a matrix of only the columns listed from the input matrix
 If a column index in the list is beyond the input matrix, it's ignored
 """
+
+
 def grabColumns(matrix, cols):
-  newMatrix = []
-  for row in matrix:
-    newMatrixRow = []
-    for j in range(len(row)):
-      if j in cols:
-	newMatrixRow.append(row[j])
-    newMatrix.append(newMatrixRow)
-  return newMatrix
+    newMatrix = []
+    for row in matrix:
+        newMatrixRow = []
+        for j in range(len(row)):
+            if j in cols:
+                newMatrixRow.append(row[j])
+        newMatrix.append(newMatrixRow)
+    return newMatrix
 
 
 """
@@ -512,81 +539,67 @@ Output:
 
 Executes learning of activity matrix and baseline values in cs matrix
 """
+
+
 def tfaInferenceValidation(inputFiles, fileLabel, numIterations, modelParams):
-  startFile, csFile, tfaFile, dataFile = inputFiles
-  csFlag, lassoFlag, maFlag = modelParams
-  
-  # Put model data into matrices and lists
-  # this function is in TFAinferenceIO.py
-  A = readMatrixFromFile(tfaFile)
-  C = readMatrixFromFile(csFile)
-  Ctemp = readMatrixFromFile(startFile)
-  data = readMatrixFromFile(dataFile)
+    startFile, csFile, tfaFile, dataFile = inputFiles
+    csFlag, lassoFlag, maFlag = modelParams
 
-  #numGenes = len(data)
-  #numSamples = len(data[0])
-  #numTFs = len(A)
-  
-  cProgression = []
-  aProgression = []
-  
-  start = time.time()
+    # Put model data into matrices and lists
+    # this function is in TFAinferenceIO.py
+    A = readMatrixFromFile(tfaFile)
+    C = readMatrixFromFile(csFile)
+    Ctemp = readMatrixFromFile(startFile)
+    data = readMatrixFromFile(dataFile)
 
-  for iter in range(numIterations):
-  
-    print "\niteration ", iter, "\n"
-  
-    Atemp = learnTFA(A, Ctemp, data, [])
-    if Atemp == False:
-      print "Could not learn the activity matrix"
-      return
+    # numGenes = len(data)
+    # numSamples = len(data[0])
+    # numTFs = len(A)
 
-    Ctemp = learnCSValidation(Atemp, C, data, [csFlag, 0, maFlag])
-      
-    if Ctemp == False:
-      print "Could not learn the control strength"
-      return
+    cProgression = []
+    aProgression = []
 
-    aProgression.append(Atemp)
-    cProgression.append(Ctemp) 
+    start = time.time()
 
-    currentVarExplained, currentError = calcError(data, matrixMultiply(Ctemp, Atemp), True)
-    # log the results every 10 iterations
-    if iter%10 == 0:
-      saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog"+fileLabel+".csv", "logFiles/tfaLog"+fileLabel+".csv", "logFiles/varExplainedLog"+fileLabel+".csv")
-  
-  end = time.time()
-  
-  print "\n\n\n"
-  print "done learning, now review:"
-  
-  for iteration in range(numIterations):
-    C = cProgression[iteration]
-    A = aProgression[iteration]
-    print "iteration ", iteration
-    dataTemp = matrixMultiply(C,A)
-    var, l2 = calcError(data, dataTemp, True)
-  
-  print "total run time (secs): ", end-start
-  
-  saveResults(Ctemp, Atemp, var, "results/learnedCS"+fileLabel+".csv", "results/learnedTFA"+fileLabel+".csv", "results/learnedVarExplained"+fileLabel+".csv")
+    for iter in range(numIterations):
 
-  return var
+        print("\niteration ", iter, "\n")
 
+        Atemp = learnTFA(A, Ctemp, data, [])
+        if Atemp == False:
+            print("Could not learn the activity matrix")
+            return
 
+        Ctemp = learnCSValidation(Atemp, C, data, [csFlag, 0, maFlag])
 
+        if Ctemp == False:
+            print("Could not learn the control strength")
+            return
 
+        aProgression.append(Atemp)
+        cProgression.append(Ctemp)
 
+        currentVarExplained, currentError = calcError(data, np.multiply(Ctemp, Atemp), True)
+        # log the results every 10 iterations
+        if iter % 10 == 0:
+            saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog" + fileLabel + ".csv",
+                        "logFiles/tfaLog" + fileLabel + ".csv", "logFiles/varExplainedLog" + fileLabel + ".csv")
 
+    end = time.time()
 
+    print("\n\n\n")
+    print("done learning, now review:")
 
+    for iteration in range(numIterations):
+        C = cProgression[iteration]
+        A = aProgression[iteration]
+        print("iteration ", iteration)
+        dataTemp = np.multiply(C, A)
+        var, l2 = calcError(data, dataTemp, True)
 
+    print("total run time (secs): ", end - start)
 
+    saveResults(Ctemp, Atemp, var, "results/learnedCS" + fileLabel + ".csv", "results/learnedTFA" + fileLabel + ".csv",
+                "results/learnedVarExplained" + fileLabel + ".csv")
 
-
-
-
-
-
-
-
+    return var
