@@ -370,10 +370,10 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
                     print("param", param, "cross", cross)
                     Ctest = learnCS(trainA[cross], C, trainData[cross], [csFlag, param * 0.1 * coeffSum, maFlag])
                     if Ctest != False:
-                        validationData = np.multiply(Ctest, testA[cross])
+                        validationData = np.dot(Ctest, testA[cross])
                         var, l2 = calcError(testData[cross], validationData, False)
                         errorList.append(l2)
-                        var, l2 = calcError(trainData[cross], np.multiply(Ctest, trainA[cross]), False)
+                        var, l2 = calcError(trainData[cross], np.dot(Ctest, trainA[cross]), False)
                         trainErrorList.append(l2)
                         for row in map(list, zip(*validationData)):
                             testDataCompilation.append(row)
@@ -381,6 +381,7 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
                             realDataCompilation.append(row)
                     else:
                         lassoLog.write("could not learn with param " + str(param) + " on fold " + str(cross) + "\t")
+                #print(errorList)
                 if sum(errorList) / len(errorList) < bestError:
                     bestParam = param
                     bestError = sum(errorList) / len(errorList)
@@ -398,7 +399,7 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
                     lassoLog.write(str(round(x, 3)) + ", ")
                 lassoLog.write("}\t")
                 lassoLog.write(str(round(sum(trainErrorList) / len(trainErrorList), 3)) + "\t")  # avg training error
-                testVar, testL2 = calcError(map(list, zip(*realDataCompilation)), map(list, zip(*testDataCompilation)),
+                testVar, testL2 = calcError(list(map(list, zip(*realDataCompilation))), list(map(list, zip(*testDataCompilation))),
                                             False)
                 lassoLog.write(str(round(testVar, 3)) + "\t")  # var explained over all test results
 
@@ -409,14 +410,14 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
             if Ctemp == False:
                 print("Could not learn the control strength")
                 return
-            var, l2 = calcError(data, np.multiply(Ctemp, Atemp), False)
+            var, l2 = calcError(data, np.dot(Ctemp, Atemp), False)
             lassoLog.write(str(round(l2, 3)) + "\n")  # error over all data
             lassoLog.close()
 
         aProgression.append(Atemp)
         cProgression.append(Ctemp)
 
-        currentVarExplained, currentError = calcError(data, np.multiply(Ctemp, Atemp), True)
+        currentVarExplained, currentError = calcError(data, np.dot(Ctemp, Atemp), True)
         # log the results every 10 iterations
         if iter % 10 == 0:
             saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog" + fileLabel + ".csv",
@@ -431,7 +432,7 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
         C = cProgression[iteration]
         A = aProgression[iteration]
         print("iteration ", iteration)
-        dataTemp = np.multiply(C, A)
+        dataTemp = np.dot(C, A)
         var, l2 = calcError(data, dataTemp, True)
 
     print("total run time (secs): ", end - start)
@@ -579,7 +580,7 @@ def tfaInferenceValidation(inputFiles, fileLabel, numIterations, modelParams):
         aProgression.append(Atemp)
         cProgression.append(Ctemp)
 
-        currentVarExplained, currentError = calcError(data, np.multiply(Ctemp, Atemp), True)
+        currentVarExplained, currentError = calcError(data, np.dot(Ctemp, Atemp), True)
         # log the results every 10 iterations
         if iter % 10 == 0:
             saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog" + fileLabel + ".csv",
@@ -594,7 +595,7 @@ def tfaInferenceValidation(inputFiles, fileLabel, numIterations, modelParams):
         C = cProgression[iteration]
         A = aProgression[iteration]
         print("iteration ", iteration)
-        dataTemp = np.multiply(C, A)
+        dataTemp = np.dot(C, A)
         var, l2 = calcError(data, dataTemp, True)
 
     print("total run time (secs): ", end - start)
