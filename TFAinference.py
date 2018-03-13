@@ -465,7 +465,7 @@ def cvSampleSplits(numSamples, folds):
     else:
         unsampled = range(numSamples)
         for i in range(folds):
-            testCols = random.sample(unsampled, len(unsampled) / (folds - i))
+            testCols = random.sample(unsampled, int(len(unsampled) / (folds - i)))
             # print("test", testCols)
             trainCols = [x for x in range(numSamples) if x not in testCols]
             # print("train", trainCols)
