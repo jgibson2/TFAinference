@@ -99,7 +99,7 @@ def calcError(data, dataLearned, printFlag):
         #     denominator += (data[i][j] - geneMean) * (data[i][j] - geneMean)
         #     numValues += 1
         geneMean = np.mean(data[i]) # temp value to calculate error
-        numerator += sum(np.square(np.subtract(data, dataLearned)))
+        numerator += sum(np.square(np.subtract(data[i], dataLearned[i])))
         denominator += sum(np.square(np.apply_along_axis(lambda x: x-geneMean, 0, data[i])))
         numValues += len(data[i])
     if printFlag:
