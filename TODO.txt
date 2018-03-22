@@ -1,4 +1,3 @@
-* Convert to Python3
 * Add error handling instead of print statements
-* Convert to numpy
 * Parallelize Gurobi calls
+* Try elastic net instead of lasso *(https://en.wikipedia.org/wiki/Lasso_(statistics)#Elastic_net)

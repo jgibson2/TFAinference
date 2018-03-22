@@ -107,3 +107,35 @@ def calcError(data, dataLearned, printFlag):
         print("variance explained: ", 1 - (numerator / denominator))
         print("Sum of Squared Errors: ", numerator)
     return 1 - (numerator / denominator), numerator
+
+
+"""
+Input:
+    matrix A, matrix B
+    l, optional pseudocount value to add to each parameter when calculating fold change
+Output:
+    maximum absolute fold change across all parameters in matricies A and B
+"""
+def foldChange(A, B, l=0):
+    # calculate the fold-change between A and B
+    ab = np.multiply(np.array(A) + l, 1.0 / (np.array(B) + l)) - 1.0
+    # calculate the fold-change between B and A
+    ba = np.multiply(np.array(B) + l, 1.0 / (np.array(A) + l)) - 1.0
+    # """
+    # Here, we calculate the fold-change of each element between the matricies. This is currently unnecessary
+    # but might be helpful in the future
+    # d = np.fmax(np.absolute(ab), np.absolute(ba))
+
+    # opt = np.get_printoptions()
+    # np.set_printoptions(threshold=np.inf)
+    # print(d)
+    # np.set_printoptions(**opt)
+
+    # """
+    # calculate maximum absolute fold change
+    # FIX nan RESULTS
+    e = max(map(lambda x: max(abs(np.nanmax(x)), abs(np.nanmin(x))), (ab, ba)))
+
+    # print(list(map(lambda x: max(abs(np.nanmax(x)), abs(np.nanmin(x))), (ab, ba))))
+
+    return e

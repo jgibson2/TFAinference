@@ -309,7 +309,7 @@ Executes whole process of TFA inference learning
 """
 
 
-def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
+def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIterations = 3, foldChangeLimit = 0.1, errorChangeLimit=1.0):
     startFile, csFile, tfaFile, dataFile = inputFiles
     csFlag, lassoFlag, maFlag = modelParams
 
@@ -333,6 +333,10 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
         trainColsList, testColsList = cvSampleSplits(numSamples, 10)
 
     start = time.time()
+
+    identicalCounter = 0
+    prevError = 0
+
 
     for iter in range(numIterations):
 
@@ -414,10 +418,38 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams):
             lassoLog.write(str(round(l2, 3)) + "\n")  # error over all data
             lassoLog.close()
 
+        currentVarExplained, currentError = calcError(data, np.dot(Ctemp, Atemp), True)
+
+        # calculate change in error percent
+        identical = abs(currentError - prevError) <= errorChangeLimit
+        # don't waste time and don't calculate if we don't already have a previous Atemp and Ctemp
+        if identical and aProgression and cProgression:
+            # make sure that the fold-change for each parameter in the matrix is below the limit
+            identical = identical and foldChange(Atemp, aProgression[-1]) <= foldChangeLimit and \
+                        foldChange(Ctemp, cProgression[-1]) <= foldChangeLimit
+            if identical:
+                identicalCounter += 1
+                # check if we have reached the proper number of identical iterations
+                if identicalCounter == identicalIterations:
+                    # adjust the number of iterations and then break out of the loop
+                    numIterations = iter + 1
+                    break
+            else:
+                # otherwise, reset the counter
+                identicalCounter = 0
+        else:
+            identicalCounter = 0
+
+
+        print('Fold change in A', foldChange(Atemp, aProgression[-1]))
+        print('Fold change in C', foldChange(Ctemp, cProgression[-1]))
+        print('Change in error:', abs(currentError - prevError))
+
         aProgression.append(Atemp)
         cProgression.append(Ctemp)
+        prevError = currentError
 
-        currentVarExplained, currentError = calcError(data, np.dot(Ctemp, Atemp), True)
+
         # log the results every 10 iterations
         if iter % 10 == 0:
             saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog" + fileLabel + ".csv",
