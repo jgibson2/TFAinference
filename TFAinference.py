@@ -443,6 +443,7 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIte
         if aProgression and cProgression:
             print('Fold change in A', foldChange(Atemp, aProgression[-1]))
             print('Fold change in C', foldChange(Ctemp, cProgression[-1]))
+            print('Fold change in C*A', foldChange(np.dot(Ctemp, Atemp), np.dot(cProgression[-1], aProgression[-1])))
             print('Change in error:', abs(currentError - prevError))
 
         aProgression.append(Atemp)
