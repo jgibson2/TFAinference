@@ -138,9 +138,9 @@ def foldChange(A, B, l=0, method='max'):
     if method == 'max':
         e = max(map(lambda x: max(abs(np.nanmax(x)), abs(np.nanmin(x))), (ab, ba)))
     elif method == 'mean':
-        e = np.mean(np.fmax(np.absolute(ab), np.absolute(ba)))
+        e = np.nanmean(np.fmax(np.absolute(ab), np.absolute(ba)))
     elif method == 'median':
-        e = np.median(np.fmax(np.absolute(ab), np.absolute(ba)))
+        e = np.nanmedian(np.fmax(np.absolute(ab), np.absolute(ba)))
 
     return e
 
