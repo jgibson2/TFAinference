@@ -116,7 +116,7 @@ Input:
 Output:
     maximum absolute fold change across all parameters in matricies A and B
 """
-def foldChange(A, B, l=0):
+def foldChange(A, B, l=0, method='max'):
     # calculate the fold-change between A and B
     ab = np.multiply(np.array(A) + l, 1.0 / (np.array(B) + l)) - 1.0
     # calculate the fold-change between B and A
@@ -134,9 +134,13 @@ def foldChange(A, B, l=0):
     # """
     # calculate maximum absolute fold change
     # FIX nan RESULTS
-    e = max(map(lambda x: max(abs(np.nanmax(x)), abs(np.nanmin(x))), (ab, ba)))
-
-    # print(list(map(lambda x: max(abs(np.nanmax(x)), abs(np.nanmin(x))), (ab, ba))))
+    e = np.inf
+    if method == 'max':
+        e = max(map(lambda x: max(abs(np.nanmax(x)), abs(np.nanmin(x))), (ab, ba)))
+    elif method == 'mean':
+        e = np.mean(np.fmax(np.absolute(ab), np.absolute(ba)))
+    elif method == 'median':
+        e = np.median(np.fmax(np.absolute(ab), np.absolute(ba)))
 
     return e
 
