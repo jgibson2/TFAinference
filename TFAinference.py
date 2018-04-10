@@ -309,7 +309,7 @@ Executes whole process of TFA inference learning
 """
 
 
-def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIterations = 3, foldChangeLimit = 0.1, errorChangeLimit=1.0, pseudocount=0.001):
+def tfaInference(inputFiles, fileLabel, numIterations, modelParams, logAll = False, identicalIterations = 3, foldChangeLimit = 0.1, errorChangeLimit=1.0, pseudocount=0.001):
     startFile, csFile, tfaFile, dataFile = inputFiles
     csFlag, lassoFlag, maFlag = modelParams
 
@@ -454,7 +454,7 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIte
 
 
         # log the results every 10 iterations
-        if iter % 10 == 0:
+        if iter % 10 == 0 or logAll:
             saveResults(Ctemp, Atemp, currentVarExplained, "logFiles/csLog" + fileLabel + ".csv",
                         "logFiles/tfaLog" + fileLabel + ".csv", "logFiles/varExplainedLog" + fileLabel + ".csv")
 

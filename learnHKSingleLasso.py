@@ -57,7 +57,7 @@ def learnSingleRandomStart():
     inputFiles = [randStartFile, binaryCSFilename, binaryTFAFilename, matrixEFilename]
     # this function is in TFAinference.py
     # returns the variance learned
-    var = tfaInference(inputFiles, fileLabel + str(i), iterations, modelParams)
+    var = tfaInference(inputFiles, fileLabel + str(i), iterations, modelParams, logAll = True)
 
 
 learnSingleRandomStart()
