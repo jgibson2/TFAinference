@@ -309,7 +309,7 @@ Executes whole process of TFA inference learning
 """
 
 
-def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIterations = 3, foldChangeLimit = 0.1, errorChangeLimit=1.0):
+def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIterations = 3, foldChangeLimit = 0.1, errorChangeLimit=1.0, pseudocount=0.001):
     startFile, csFile, tfaFile, dataFile = inputFiles
     csFlag, lassoFlag, maFlag = modelParams
 
@@ -420,6 +420,7 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIte
 
         currentVarExplained, currentError = calcError(data, np.dot(Ctemp, Atemp), True)
 
+        '''
         # calculate change in error percent
         identical = abs(currentError - prevError) <= errorChangeLimit
         # don't waste time and don't calculate if we don't already have a previous Atemp and Ctemp
@@ -439,11 +440,12 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams, identicalIte
                 identicalCounter = 0
         else:
             identicalCounter = 0
+        '''
 
         if aProgression and cProgression:
-            print('Fold change in A', foldChange(Atemp, aProgression[-1]))
-            print('Fold change in C', foldChange(Ctemp, cProgression[-1]))
-            print('Fold change in C*A', foldChange(np.dot(Ctemp, Atemp), np.dot(cProgression[-1], aProgression[-1])))
+            print('Fold change in A', foldChange(Atemp, aProgression[-1], l=pseudocount, method='max'))
+            print('Fold change in C', foldChange(Ctemp, cProgression[-1], l=pseudocount, method='max'))
+            print('Fold change in C*A', foldChange(np.dot(Ctemp, Atemp), np.dot(cProgression[-1], aProgression[-1]), l=pseudocount, method='max'))
             print('Change in error:', abs(currentError - prevError))
 
         aProgression.append(Atemp)
