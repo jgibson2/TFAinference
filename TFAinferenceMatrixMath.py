@@ -155,13 +155,13 @@ Output:
 """
 def logFoldChange(A, B, l=0.0, method='max'):
     # calculate the fold-change between A and B
-    a = np.log2(np.array(A) + l)
+    a = np.log2(np.absolute(np.array(A) + l))
     # calculate the fold-change between B and A
-    b = np.log2(np.array(B) + l)
+    b = np.log2(np.absolute(np.array(B) + l))
     log_matrix = np.absolute(a - b)
     e = np.inf
     if method == 'max':
-        e = np.fmax(log_matrix)
+        e = np.nanmax(log_matrix)
     elif method == 'mean':
         e = np.nanmean(log_matrix)
     elif method == 'median':
