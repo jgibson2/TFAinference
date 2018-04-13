@@ -116,7 +116,7 @@ Input:
 Output:
     maximum absolute fold change across all parameters in matricies A and B
 """
-def foldChange(A, B, l=0, method='max'):
+def foldChange(A, B, l=0.0, method='max'):
     # calculate the fold-change between A and B
     ab = np.multiply(np.array(A) + l, 1.0 / (np.array(B) + l)) - 1.0
     # calculate the fold-change between B and A
@@ -141,7 +141,32 @@ def foldChange(A, B, l=0, method='max'):
         e = np.nanmean(np.fmax(np.absolute(ab), np.absolute(ba)))
     elif method == 'median':
         e = np.nanmedian(np.fmax(np.absolute(ab), np.absolute(ba)))
-
+    else:
+        raise ValueError('Unrecognized method!')
     return e
 
+
+"""
+Input:
+    matrix A, matrix B
+    l, optional pseudocount value to add to each parameter when calculating fold change
+Output:
+    maximum log2 fold change across all parameters in matricies A and B
+"""
+def logFoldChange(A, B, l=0.0, method='max'):
+    # calculate the fold-change between A and B
+    a = np.log2(np.array(A) + l)
+    # calculate the fold-change between B and A
+    b = np.log2(np.array(B) + l)
+    log_matrix = np.absolute(a - b)
+    e = np.inf
+    if method == 'max':
+        e = np.fmax(log_matrix)
+    elif method == 'mean':
+        e = np.nanmean(log_matrix)
+    elif method == 'median':
+        e = np.nanmedian(log_matrix)
+    else:
+        raise ValueError('Unrecognized method!')
+    return e
 

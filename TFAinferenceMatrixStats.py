@@ -84,7 +84,7 @@ def computeResultsWithinVarianceBoundOfOptimalSolution(varsExplained, varianceEx
     v = list(enumerate(varsExplained))
     # v.sort(key=lambda x: x[1])
     opt = max(v, key= lambda x: x[1])
-    return [i for i,x in filter(lambda x: abs(x - opt[1]) <= varianceExplainedBound, v)], opt[0]
+    return [i for i,x in filter(lambda x: abs(x[1] - opt[1]) <= varianceExplainedBound, v)], opt[0]
 
 
 '''
