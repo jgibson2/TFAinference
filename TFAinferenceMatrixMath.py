@@ -158,7 +158,7 @@ def logFoldChange(A, B, l=0.0, method='max'):
     a = np.log2(np.array(A) + l)
     # calculate the fold-change between B and A
     b = np.log2(np.array(B) + l)
-    log_matrix = np.absolute(a - b)
+    log_matrix = a - b
     e = np.inf
     if method == 'max':
         e = np.fmax(log_matrix)
@@ -170,3 +170,51 @@ def logFoldChange(A, B, l=0.0, method='max'):
         raise ValueError('Unrecognized method!')
     return e
 
+
+"""
+Calculates finite differences for each parameter for each gene to get significance of each parameter for weighing parameters
+
+TODO: how to quantify finite difference approximations (derivatives)? Sum of absolute value of derivatives? Normal sum of differences? Different methods? Ask Michael and Cynthia
+
+"""
+def finiteDifferences(cs, tfa, epsilon=0.001):
+    cs = np.array(cs, dtype=np.float64)
+    tfa = np.array(tfa, dtype=np.float64)
+    # norm = np.dot(cs, tfa)
+    csDerivatives = np.zeros(shape=cs.shape)
+    tfaDerivatives = np.zeros(shape=tfa.shape)
+    (i, j) = cs.shape
+    (j, k) = tfa.shape
+    for a in range(0, i):
+        for b in range(0, j):
+            mask = np.zeros(shape=cs.shape, dtype=np.float64)
+            mask[a][b] += epsilon
+            derivs = (np.dot((cs + mask), tfa) - np.dot((cs - mask), tfa)) / (2*epsilon)
+
+            ######### BEGIN QUANTIFICATION METHOD HERE ###############
+
+            csDerivatives[a][b] = np.sum(np.abs(derivs))
+
+            ######### END QUANTIFICATION METHOD ######################
+
+    for a in range(0, j):
+        for b in range(0, k):
+            mask = np.zeros(shape=cs.shape, dtype=np.float64)
+            mask[a][b] += epsilon
+            derivs = (np.dot(cs, tfa + mask) - np.dot(cs, tfa - mask)) / (2*epsilon)
+
+            ######### BEGIN QUANTIFICATION METHOD HERE ###############
+
+            tfaDerivatives[a][b] = np.sum(np.abs(derivs))
+
+            ######### END QUANTIFICATION METHOD ######################
+
+    return csDerivatives, tfaDerivatives
+
+
+"""
+Computes pseudocount for CS matrix (10% of average value)
+"""
+
+def computeCSPseudocount(cs):
+    return 0.1 * np.nanmean(cs)

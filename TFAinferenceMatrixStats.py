@@ -1,10 +1,11 @@
-from TFAinferenceMatrixMath import calcError, foldChange
+from TFAinferenceMatrixMath import calcError, foldChange, computeCSPseudocount
 from TFAinferenceIO import readMatrixFromFile
 import argparse
 import matplotlib
 import numpy as np
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 
 """
 These functions compute various data for successive iterations of a SINGLE RANDOM START
@@ -20,7 +21,7 @@ Param:
     upper_limit: upper limit of pseudocount
     step = step size for pseudocount
 '''
-def computeFoldChangesWithPseudocountRange(matricies, lower_limit=0, upper_limit=10, step=0.01):
+def computeFoldChangesWithPseudocountRange(matricies, lower_limit=0, upper_limit=1, step=0.1):
     results = [] # list to hold results, format (pseudocount, [foldchange across subsequent matricies])
     for ps in np.arange(lower_limit, upper_limit, step):
         r = [] # intermediate results
@@ -39,7 +40,7 @@ Param:
     upper_limit: upper limit of pseudocount
     step = step size for pseudocount
 '''
-def computeFoldChangesWithPseudocountRange_SINGLE(A, B, lower_limit=0, upper_limit=10, step=0.01, method='max'):
+def computeFoldChangesWithPseudocountRange_SINGLE(A, B, lower_limit=0, upper_limit=1, step=0.1, method='max'):
     r = []
     for ps in np.arange(lower_limit, upper_limit, step):
         r.append((ps, foldChange(A, B, l=ps, method=method)))
@@ -102,7 +103,7 @@ def computeResultsWithinNormalizedErrorChangeBoundOfOptimalSolution(errors, erro
 
 
 
-def computeNumberOfResultsWithinVarianceBoundRangeOfOptimalSolution(varsExplained, lower_limit=0.01, upper_limit=3, step=0.05):
+def computeNumberOfResultsWithinVarianceBoundRangeOfOptimalSolution(varsExplained, lower_limit=0.0, upper_limit=0.5, step=0.05):
     return [(bound, len(computeResultsWithinVarianceBoundOfOptimalSolution(varsExplained, varianceExplainedBound=bound))) for bound in np.arange(lower_limit, upper_limit, step)]
 
 
@@ -133,6 +134,8 @@ if __name__ == '__main__':
     # parser.add_argument('--error', '-e', action='store_true', help='Output error plots')
     parser.add_argument('--iterations', '-i', type=int, action='store', default=100, help='Number of iterations in log files')
     parser .add_argument('--results', '-r', action='store_true', help='Using final results from random starts')
+    parser .add_argument('--computePseudocounts', action='store_true', help='Use computed pseudocounts for CS matrix')
+
     args = parser.parse_args()
 
     y_limit = [0, args.limit]
@@ -149,9 +152,8 @@ if __name__ == '__main__':
             tfa_matricies.append(readMatrixFromFile(file))
         for file in args.variances:
             with open(file) as f:
-                for line in f:
-                    line = line.strip()
-                    varsExplained.append(float(line))
+                line = f.readline().strip()
+                varsExplained.append(float(line))
 
 
         ####
@@ -188,19 +190,34 @@ if __name__ == '__main__':
         plt.savefig(args.output + '_foldChangeResultsInVarRange_TFA.png')
         plt.clf()
 
+
+
     # intermediate results, with multiple matricies per file
     else:
-        for file in args.cs:
-            cs_matricies.append(read_all_matricies(file, args.iterations))
-            ps_foldchanges = computeFoldChangesWithPseudocountRange(cs_matricies[-1])
-            for ps, foldchanges in ps_foldchanges:
-                plt.plot([x+1 for x in range(1, len(foldchanges) + 1)], foldchanges, '-', label=str(ps))
-            plt.title('Fold-change in CS for differing pseudocounts (Limited to {})'.format(str(y_limit)))
-            plt.xlabel('Iteration')
-            plt.legend()
-            plt.ylim(y_limit)
-            plt.savefig(file + '_foldChangesPseudocounts.png')
-            plt.clf()
+        if args.computePseudocounts:
+            for file in args.cs:
+                cs_matricies.append(read_all_matricies(file, args.iterations))
+                r = []  # intermediate results
+                for i in range(0, len(cs_matricies[-1]) - 1):
+                    r.append(foldChange(cs_matricies[-1][i], cs_matricies[-1][i+1], l=computeCSPseudocount(cs_matricies[-1][i])))
+                plt.plot([x + 1 for x in range(1, len(r) + 1)], r, '-')
+                plt.title('Fold-change in CS for computed pseudocounts (Limited to {})'.format(str(y_limit)))
+                plt.xlabel('Iteration')
+                plt.ylim(y_limit)
+                plt.savefig(file + '_foldChangesComputedPseudocounts.png')
+                plt.clf()
+        else:
+            for file in args.cs:
+                cs_matricies.append(read_all_matricies(file, args.iterations))
+                ps_foldchanges = computeFoldChangesWithPseudocountRange(cs_matricies[-1])
+                for ps, foldchanges in ps_foldchanges:
+                    plt.plot([x+1 for x in range(1, len(foldchanges) + 1)], foldchanges, '-', label=str(ps))
+                plt.title('Fold-change in CS for differing pseudocounts (Limited to {})'.format(str(y_limit)))
+                plt.xlabel('Iteration')
+                plt.legend()
+                plt.ylim(y_limit)
+                plt.savefig(file + '_foldChangesPseudocounts.png')
+                plt.clf()
         for file in args.tfa:
             tfa_matricies.append(read_all_matricies(file, args.iterations))
             ps_foldchanges = computeFoldChangesWithPseudocountRange(tfa_matricies[-1])
@@ -225,3 +242,25 @@ if __name__ == '__main__':
             plt.xlabel('Iteration')
             plt.savefig(file + '_changesInVarianceExplained.png')
             plt.clf()
+
+        ####
+        # Plot the number of matricies that are already in their final positions in terms of variance explained
+        ####
+        numbered_variances = list(enumerate(varsExplained))
+        final = sorted(numbered_variances, key=lambda x:x[1][-1])
+        results = []
+
+        for i in range(args.iterations):
+            r = 0
+            tmp = sorted(numbered_variances, key=lambda x:x[1][i])
+            for (final_pos, final_vars),(pos, vars) in zip(final,tmp):
+                if final_pos == pos:
+                    r += 1
+            results += r
+
+        plt.plot([x + 1 for x in range(1, len(results) + 1)], results, 'r-')
+        plt.title('Rank-Order Correlations between Variance Explained Rank after n Iterations')
+        plt.xlabel('Iteration')
+        plt.savefig(args.output + '_varExplainedRankCorrelation.png')
+        plt.clf()
+
