@@ -1,4 +1,4 @@
-from TFAinferenceMatrixMath import calcError, foldChange, logFoldChange
+from TFAinferenceMatrixMath import calcError, foldChange, logFoldChange, computeCSPseudocount
 from TFAinferenceIO import readMatrixFromFile
 import argparse
 import matplotlib
