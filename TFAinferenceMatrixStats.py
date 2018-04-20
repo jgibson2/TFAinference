@@ -1,11 +1,10 @@
-from TFAinferenceMatrixMath import calcError, foldChange, computeCSPseudocount
+from TFAinferenceMatrixMath import calcError, foldChange, logFoldChange
 from TFAinferenceIO import readMatrixFromFile
 import argparse
 import matplotlib
 import numpy as np
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
 
 """
 These functions compute various data for successive iterations of a SINGLE RANDOM START
@@ -30,6 +29,24 @@ def computeFoldChangesWithPseudocountRange(matricies, lower_limit=0, upper_limit
         results.append((ps, r))
     return results
 
+
+'''
+Computes log fold changes with various pseudocounts
+
+Param:
+    matricies: list of matrixes
+    lower_limit: lower limit of pseudocount
+    upper_limit: upper limit of pseudocount
+    step = step size for pseudocount
+'''
+def computeLogFoldChangesWithPseudocountRange(matricies, lower_limit=0, upper_limit=1, step=0.1):
+    results = [] # list to hold results, format (pseudocount, [foldchange across subsequent matricies])
+    for ps in np.arange(lower_limit, upper_limit, step):
+        r = [] # intermediate results
+        for i in range(0, len(matricies) - 1):
+            r.append(logFoldChange(matricies[i], matricies[i+1], l=ps))
+        results.append((ps, r))
+    return results
 '''
 Computes fold changes with various pseudocounts for ONE matrix pair
 
@@ -85,7 +102,8 @@ def computeResultsWithinVarianceBoundOfOptimalSolution(varsExplained, varianceEx
     v = list(enumerate(varsExplained))
     # v.sort(key=lambda x: x[1])
     opt = max(v, key= lambda x: x[1])
-    return [i for i,x in filter(lambda x: abs(x[1] - opt[1]) <= varianceExplainedBound, v)], opt[0]
+    res = [i for i,x in filter(lambda x: abs(x[1] - opt[1]) <= varianceExplainedBound, v)], opt[0]
+    return res
 
 
 '''
@@ -99,12 +117,13 @@ def computeResultsWithinNormalizedErrorChangeBoundOfOptimalSolution(errors, erro
     v = list(enumerate(computeNormalizedChangesInError(errors)))
     # v.sort(key=lambda x: x[1])
     opt = min(errors)
-    return [i for i,x in filter(lambda x: abs(x - opt) <= errorChangeBound, v)]
+    res = [i for i,x in filter(lambda x: abs(x - opt) <= errorChangeBound, v)]
+    return res
 
 
 
-def computeNumberOfResultsWithinVarianceBoundRangeOfOptimalSolution(varsExplained, lower_limit=0.0, upper_limit=0.5, step=0.05):
-    return [(bound, len(computeResultsWithinVarianceBoundOfOptimalSolution(varsExplained, varianceExplainedBound=bound))) for bound in np.arange(lower_limit, upper_limit, step)]
+def computeNumberOfResultsWithinVarianceBoundRangeOfOptimalSolution(varsExplained, lower_limit=0.0, upper_limit=0.05, step=0.001):
+    return [(bound, len(computeResultsWithinVarianceBoundOfOptimalSolution(varsExplained, varianceExplainedBound=bound)[0])) for bound in np.arange(lower_limit, upper_limit, step)]
 
 
 def zip_fill(*argv, fill=None):
@@ -120,7 +139,7 @@ def read_all_matricies(filename, iterations):
     data = readMatrixFromFile(filename)
     if not (len(data) / iterations) % 1 == 0.0:
         raise ValueError('Data length does not match iterations!')
-    mat_length = len(data) / iterations
+    mat_length = int(len(data) / iterations)
     return [data[mat_length*i:mat_length*(i+1)] for i in range(iterations)]
 
 
@@ -190,8 +209,22 @@ if __name__ == '__main__':
         plt.savefig(args.output + '_foldChangeResultsInVarRange_TFA.png')
         plt.clf()
 
-
-
+        data = [logFoldChange(cs_matricies[x], cs_matricies[opt], l=0.001) for x in v if not x == opt]
+        plt.hist(data)
+        plt.title('Log Fold Change of Results Within Variance Explained Bound of Optimal Solution in CS matricies')
+        plt.xlabel('Log Fold Change')
+        plt.ylabel('Frequency')
+        plt.plot()
+        plt.savefig(args.output + '_logFoldChangeResultsInVarRange_CS.png')
+        plt.clf()
+        data = [logFoldChange(tfa_matricies[x], tfa_matricies[opt], l=0.001) for x in v if not x == opt]
+        plt.hist(data)
+        plt.title('Log Fold Change of Results Within Variance Explained Bound of Optimal Solution in TFA matricies')
+        plt.xlabel('Log Fold Change')
+        plt.ylabel('Frequency')
+        plt.plot()
+        plt.savefig(args.output + '_logFoldChangeResultsInVarRange_TFA.png')
+        plt.clf()
     # intermediate results, with multiple matricies per file
     else:
         if args.computePseudocounts:
@@ -218,6 +251,15 @@ if __name__ == '__main__':
                 plt.ylim(y_limit)
                 plt.savefig(file + '_foldChangesPseudocounts.png')
                 plt.clf()
+            ps_foldchanges = computeLogFoldChangesWithPseudocountRange(cs_matricies[-1])
+            for ps, foldchanges in ps_foldchanges:
+                plt.plot([x+1 for x in range(1, len(foldchanges) + 1)], foldchanges, '-', label=str(ps))
+            plt.title('Log Fold-change in CS for differing pseudocounts (Limited to {})'.format(str(y_limit)))
+            plt.xlabel('Iteration')
+            plt.legend()
+            plt.ylim(y_limit)
+            plt.savefig(file + '_logFoldChangesPseudocounts.png')
+            plt.clf()
         for file in args.tfa:
             tfa_matricies.append(read_all_matricies(file, args.iterations))
             ps_foldchanges = computeFoldChangesWithPseudocountRange(tfa_matricies[-1])
@@ -228,6 +270,15 @@ if __name__ == '__main__':
             plt.legend()
             plt.ylim(y_limit)
             plt.savefig(file + '_foldChangesPseudocounts.png')
+            plt.clf()
+            ps_foldchanges = computeLogFoldChangesWithPseudocountRange(tfa_matricies[-1])
+            for ps, foldchanges in ps_foldchanges:
+                plt.plot([x+1 for x in range(1, len(foldchanges) + 1)], foldchanges, '-', label=str(ps))
+            plt.title('Log Fold-change in TFA for differing pseudocounts (Limited to {})'.format(str(y_limit)))
+            plt.xlabel('Iteration')
+            plt.legend()
+            plt.ylim(y_limit)
+            plt.savefig(file + '_logFoldChangesPseudocounts.png')
             plt.clf()
         for file in args.variances:
             vars_tmp = []
@@ -242,6 +293,13 @@ if __name__ == '__main__':
             plt.xlabel('Iteration')
             plt.savefig(file + '_changesInVarianceExplained.png')
             plt.clf()
+        for i,vars_list in enumerate(varsExplained):
+            plt.plot([x+1 for x in range(1, len(vars_list) + 1)], vars_list, '-', label=str(i))
+            plt.title('Variance Explained')
+            plt.xlabel('Iteration')
+            plt.savefig(args.output + '_variancesExplained.png')
+
+
 
         ####
         # Plot the number of matricies that are already in their final positions in terms of variance explained

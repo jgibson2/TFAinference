@@ -161,7 +161,7 @@ def logFoldChange(A, B, l=0.0, method='max'):
     log_matrix = a - b
     e = np.inf
     if method == 'max':
-        e = np.fmax(log_matrix)
+        e = np.nanmax(log_matrix)
     elif method == 'mean':
         e = np.nanmean(log_matrix)
     elif method == 'median':
