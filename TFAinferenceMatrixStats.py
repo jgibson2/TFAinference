@@ -239,6 +239,12 @@ if __name__ == '__main__':
                 plt.ylim(y_limit)
                 plt.savefig(file + '_foldChangesComputedPseudocounts.png')
                 plt.clf()
+                plt.plot([x + 1 for x in range(1, len(cs_matricies[-1]) + 1)], [computeCSPseudocount(cs_matricies[-1][i]) for i in range(len(cs_matricies[-1]))], '-')
+                plt.title('Computed pseudocounts')
+                plt.xlabel('Iteration')
+                plt.savefig(file + '_computedPseudocounts.png')
+                plt.clf()
+                print([computeCSPseudocount(cs_matricies[-1][i]) for i in range(len(cs_matricies[-1]))])
         else:
             for file in args.cs:
                 cs_matricies.append(read_all_matricies(file, args.iterations))
@@ -314,7 +320,7 @@ if __name__ == '__main__':
             for (final_pos, final_vars),(pos, vars) in zip(final,tmp):
                 if final_pos == pos:
                     r += 1
-            results += r
+            results.append(r)
 
         plt.plot([x + 1 for x in range(1, len(results) + 1)], results, 'r-')
         plt.title('Rank-Order Correlations between Variance Explained Rank after n Iterations')
