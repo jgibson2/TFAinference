@@ -442,11 +442,11 @@ def tfaInference(inputFiles, fileLabel, numIterations, modelParams, logAll = Fal
             identicalCounter = 0
         '''
 
-        if aProgression and cProgression:
-            print('Fold change in A', foldChange(Atemp, aProgression[-1], l=pseudocount, method='max'))
-            print('Fold change in C', foldChange(Ctemp, cProgression[-1], l=pseudocount, method='max'))
-            print('Fold change in C*A', foldChange(np.dot(Ctemp, Atemp), np.dot(cProgression[-1], aProgression[-1]), l=pseudocount, method='max'))
-            print('Change in error:', abs(currentError - prevError))
+        # if aProgression and cProgression:
+        #     print('Fold change in A', foldChange(Atemp, aProgression[-1], l=pseudocount, method='max'))
+        #     print('Fold change in C', foldChange(Ctemp, cProgression[-1], l=pseudocount, method='max'))
+        #     print('Fold change in C*A', foldChange(np.dot(Ctemp, Atemp), np.dot(cProgression[-1], aProgression[-1]), l=pseudocount, method='max'))
+        #     print('Change in error:', abs(currentError - prevError))
 
         aProgression.append(Atemp)
         cProgression.append(Ctemp)

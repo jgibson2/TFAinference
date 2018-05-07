@@ -232,12 +232,12 @@ if __name__ == '__main__':
                 cs_matricies.append(read_all_matricies(file, args.iterations))
                 r = []  # intermediate results
                 for i in range(0, len(cs_matricies[-1]) - 1):
-                    r.append(foldChange(cs_matricies[-1][i], cs_matricies[-1][i+1], l=computeCSPseudocount(cs_matricies[-1][i])))
+                    r.append(logFoldChange(cs_matricies[-1][i], cs_matricies[-1][i+1], l=computeCSPseudocount(cs_matricies[-1][i])))
                 plt.plot([x + 1 for x in range(1, len(r) + 1)], r, '-')
-                plt.title('Fold-change in CS for computed pseudocounts (Limited to {})'.format(str(y_limit)))
+                plt.title('Log Fold-change in CS for computed pseudocounts (Limited to {})'.format(str(y_limit)))
                 plt.xlabel('Iteration')
                 plt.ylim(y_limit)
-                plt.savefig(file + '_foldChangesComputedPseudocounts.png')
+                plt.savefig(file + '_logFoldChangesComputedPseudocounts.png')
                 plt.clf()
                 plt.plot([x + 1 for x in range(1, len(cs_matricies[-1]) + 1)], [computeCSPseudocount(cs_matricies[-1][i]) for i in range(len(cs_matricies[-1]))], '-')
                 plt.title('Computed pseudocounts')
@@ -257,15 +257,15 @@ if __name__ == '__main__':
                 plt.ylim(y_limit)
                 plt.savefig(file + '_foldChangesPseudocounts.png')
                 plt.clf()
-            ps_foldchanges = computeLogFoldChangesWithPseudocountRange(cs_matricies[-1])
-            for ps, foldchanges in ps_foldchanges:
-                plt.plot([x+1 for x in range(1, len(foldchanges) + 1)], foldchanges, '-', label=str(ps))
-            plt.title('Log Fold-change in CS for differing pseudocounts (Limited to {})'.format(str(y_limit)))
-            plt.xlabel('Iteration')
-            plt.legend()
-            plt.ylim(y_limit)
-            plt.savefig(file + '_logFoldChangesPseudocounts.png')
-            plt.clf()
+                ps_foldchanges = computeLogFoldChangesWithPseudocountRange(cs_matricies[-1])
+                for ps, foldchanges in ps_foldchanges:
+                    plt.plot([x+1 for x in range(1, len(foldchanges) + 1)], foldchanges, '-', label=str(ps))
+                plt.title('Log Fold-change in CS for differing pseudocounts (Limited to {})'.format(str(y_limit)))
+                plt.xlabel('Iteration')
+                plt.legend()
+                plt.ylim(y_limit)
+                plt.savefig(file + '_logFoldChangesPseudocounts.png')
+                plt.clf()
         for file in args.tfa:
             tfa_matricies.append(read_all_matricies(file, args.iterations))
             ps_foldchanges = computeFoldChangesWithPseudocountRange(tfa_matricies[-1])
@@ -326,5 +326,17 @@ if __name__ == '__main__':
         plt.title('Rank-Order Correlations between Variance Explained Rank after n Iterations')
         plt.xlabel('Iteration')
         plt.savefig(args.output + '_varExplainedRankCorrelation.png')
+        plt.clf()
+
+        results = []
+        max_varExplained = final[-1][1][-1] # last entry of numbered list's last var explained value
+
+        for i in range(args.iterations):
+            results.append(max_varExplained - final[i][1][-1])
+
+        plt.hist(results)
+        plt.title('Histogram of differences in variance explained of final iteration')
+        plt.xlabel('Difference in varExplained')
+        plt.savefig(args.output + '_varExplainedHist.png')
         plt.clf()
 
