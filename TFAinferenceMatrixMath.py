@@ -206,9 +206,15 @@ def finiteDifferences(cs, tfa, data, epsilon=0.001):
 """
 Computes pseudocount for CS matrix (10% of average value)
 """
-
+"""
 def computeCSPseudocount(cs):
     l = 0.1 * np.nanmean(cs, axis=0)
+    return np.repeat(l.reshape(1, -1), cs.shape[0], axis=0)
+"""
+def computeCSPseudocount(cs):
+    csNan = np.absolute(cs.copy())
+    csNan[csNan == 0] = np.nan
+    l = 0.1 * np.nanmean(csNan, axis=0)
     return np.repeat(l.reshape(1, -1), cs.shape[0], axis=0)
 
 
