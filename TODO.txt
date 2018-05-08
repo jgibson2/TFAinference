@@ -1,0 +1,17 @@
+* Convergence for all params = convergence? Or report for each individual param?
+    - All parameters converging, adjust requirements
+        Based on differential analysis -- if not affecting R^2, can't be learned -- fix them or exclude them from convergence
+* Process for determining convergence of param:
+    1. If the sign changes and the the absolute value of the difference between consecutive iterations is greater
+       than the absolute limit (same as pseudocount?), parameter does not converge
+    2. Otherwise, take the absolute pseudocounted log fold change between the parameters. If it's greater than the
+       logarithmic limit (=1), the parameter does not converge
+
+
+TODO:
+    Plot absolute log fold change
+    Finite derivatives of R^2 values -- not gene activities (recalculate incrementally?)
+    Consider 2nd derivatives of parameters as well/instead? (differences between forward and backwards derivatives over 2* epsilon) CHECK THIS!!!
+    Histogram of differences in variance explained differences in final iteration
+        Separate for CS vs TFA
+    Check whether best random restarts in terms of of R^2 converge with each other? # within epsilon of R^2?

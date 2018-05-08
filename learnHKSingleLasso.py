@@ -8,6 +8,7 @@ All input/output data files should be in csv format
 The only exception is the lasso parameter log files, which are in tsv format
 """
 
+import sys
 from TFAinference import *
 
 """
@@ -26,10 +27,10 @@ binaryCSFilename = "signedBinaryCS.csv"
 binaryTFAFilename = "binaryTFASmall.csv"
 matrixEFilename = "matrixESmall.csv"
 
-#how long to run
+# how long to run
 iterations = 100
 
-#an added tag to output file names to identify and group them
+# an added tag to output file names to identify and group them
 fileLabel = "HKwithLASSO"
 
 """
@@ -41,20 +42,22 @@ currently:
 """
 modelParams = [True, True, True]
 
-def learnSingleRandomStart():
-		#which number random start this run is
-		i = int(sys.argv[1])
-		#checking for random start file
-		randStartFile = "randStarts/randCS"+str(i)+".csv"
-		try:
-			open(randStartFile)
-		except:
-			#this function is in TFAinferenceIO.py
-			makeRandStart(binaryCSFilename, randStartFile, modelParams[0])
 
-		inputFiles = [randStartFile, binaryCSFilename, binaryTFAFilename, matrixEFilename]
-		#this function is in TFAinference.py
-		#returns the variance learned
-		var = tfaInference(inputFiles, fileLabel+str(i), iterations, modelParams)
+def learnSingleRandomStart():
+    # which number random start this run is
+    i = int(sys.argv[1])
+    # checking for random start file
+    randStartFile = "randStarts/randCS" + str(i) + ".csv"
+    try:
+        open(randStartFile)
+    except:
+        # this function is in TFAinferenceIO.py
+        makeRandStart(binaryCSFilename, randStartFile, modelParams[0])
+
+    inputFiles = [randStartFile, binaryCSFilename, binaryTFAFilename, matrixEFilename]
+    # this function is in TFAinference.py
+    # returns the variance learned
+    var = tfaInference(inputFiles, fileLabel + str(i), iterations, modelParams, logAll = True)
+
 
 learnSingleRandomStart()
