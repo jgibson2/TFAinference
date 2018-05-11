@@ -12,7 +12,7 @@ def read_all_matricies(filename, iterations):
     return np.array([data[mat_length*i:mat_length*(i+1)] for i in range(iterations)])
 
 
-def check_cs_convergence(cs_mats, in_a_row=3, log_limit=0.5):
+def check_cs_convergence(cs_mats, in_a_row=3, log_limit=0.1):
     iar = 0
     for i in range(0, len(cs_mats) - 1):
         if csConverges(cs_mats[i], cs_mats[i+1], log_limit=log_limit):
@@ -22,7 +22,7 @@ def check_cs_convergence(cs_mats, in_a_row=3, log_limit=0.5):
     return False, -1
 
 
-def check_geneexpr_convergence(mats, in_a_row=3, log_limit=0.5):
+def check_geneexpr_convergence(mats, in_a_row=3, log_limit=0.1):
     iar = 0
     for i in range(0, len(mats) - 1):
         if csConverges(mats[i], mats[i+1], log_limit=log_limit): # just use CS convergence criteria
@@ -32,7 +32,7 @@ def check_geneexpr_convergence(mats, in_a_row=3, log_limit=0.5):
     return False, -1
 
 
-def check_tfa_convergence(tfa_mats, in_a_row=3, log_limit=0.5):
+def check_tfa_convergence(tfa_mats, in_a_row=3, log_limit=0.1):
     iar = 0
     for i in range(0, len(tfa_mats) - 1):
         if tfaConverges(tfa_mats[i], tfa_mats[i+1], log_limit=log_limit):
@@ -57,6 +57,7 @@ def main():
     parser.add_argument('--iterations', '-i', type=int, action='store', default=100, help='Number of iterations in log files')
     parser.add_argument('--breaks', '-b', type=int, action='store', default=20, help='Number of iterations to consider at a time')
     parser.add_argument('--std_dev', action='store', type=str, help='Calculate standard deviations matrix for final iterations and write to file')
+    parser.add_argument('--log_limit', action='store', type=int, default=0.5, help='Log limit')
     args = parser.parse_args()
     for index, file in enumerate(args.cs):
         cs_names[index] = file
@@ -82,15 +83,15 @@ def main():
         var = [x[i:i+args.breaks] for x in varsExplained]
         for index, (c, t) in enumerate(zip(cs, tfa)):
             if cs_convergence_points[index] == -1:
-                cs_converges, cs_conv_pt = check_cs_convergence(c)
+                cs_converges, cs_conv_pt = check_cs_convergence(c, log_limit=args.log_limit)
                 if cs_converges:
                     cs_convergence_points[index] = cs_conv_pt + i
             if tfa_convergence_points[index] == -1:
-                tfa_converges, tfa_conv_pt = check_tfa_convergence(t)
+                tfa_converges, tfa_conv_pt = check_tfa_convergence(t, log_limit=args.log_limit)
                 if tfa_converges:
                     tfa_convergence_points[index] = tfa_conv_pt + i
             if geneexpr_convergence_points[index] == -1:
-                geneexpr_converges, geneexpr_conv_pt = check_geneexpr_convergence(t)
+                geneexpr_converges, geneexpr_conv_pt = check_geneexpr_convergence(t, log_limit=args.log_limit)
                 if geneexpr_converges:
                     geneexpr_convergence_points[index] = geneexpr_conv_pt + i
 
@@ -102,21 +103,21 @@ def main():
         if conv_pt != -1:
             for index2, conv_pt2 in enumerate(cs_convergence_points):
                 if index2 != index:
-                    if csConverges(cs_matricies[index][conv_pt], cs_matricies[index2][conv_pt2]):
+                    if csConverges(cs_matricies[index][conv_pt], cs_matricies[index2][conv_pt2], log_limit=args.log_limit):
                         cs_convergences[index].append(index2)
                         
     for index,conv_pt in enumerate(tfa_convergence_points):
         if conv_pt != -1:
             for index2, conv_pt2 in enumerate(tfa_convergence_points):
                 if index2 != index:
-                    if tfaConverges(tfa_matricies[index][conv_pt], tfa_matricies[index2][conv_pt2]):
+                    if tfaConverges(tfa_matricies[index][conv_pt], tfa_matricies[index2][conv_pt2], log_limit=args.log_limit):
                         tfa_convergences[index].append(index2)
                         
     for index,conv_pt in enumerate(geneexpr_convergence_points):
         if conv_pt != -1:
             for index2, conv_pt2 in enumerate(geneexpr_convergence_points):
                 if index2 != index:
-                    if csConverges(geneexpr_matricies[index][conv_pt], geneexpr_matricies[index2][conv_pt2]): #use CS criteria
+                    if csConverges(geneexpr_matricies[index][conv_pt], geneexpr_matricies[index2][conv_pt2], log_limit=args.log_limit): #use CS criteria
                         geneexpr_convergences[index].append(index2)
 
     for index, other_matricies in enumerate(cs_convergences):
@@ -133,7 +134,7 @@ def main():
     
     for index, other_matricies in enumerate(geneexpr_convergences):
         print('{0}-th matrix from {1} converged to same solution as: '.format(geneexpr_convergence_points[index],
-                                                                              '{0}*{1}'.format(cs_names[index], tfa_names[index]), end=''))
+                                                                              '{0}*{1}'.format(cs_names[index], tfa_names[index]), end=''), end='')
         print(' '.join(
             ['{0}-th matrix from {1}'.format(geneexpr_convergence_points[x], '{0}*{1}'.format(cs_names[index], tfa_names[index])) for x in other_matricies]))
 
