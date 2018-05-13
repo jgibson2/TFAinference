@@ -58,7 +58,7 @@ def main():
     parser.add_argument('--iterations', '-i', type=int, action='store', default=100, help='Number of iterations in log files')
     parser.add_argument('--breaks', '-b', type=int, action='store', default=20, help='Number of iterations to consider at a time')
     parser.add_argument('--std_dev', action='store', type=str, help='Calculate standard deviations matrix for final iterations and write to file')
-    parser.add_argument('--log_limit', action='store', type=int, default=0.5, help='Log limit')
+    parser.add_argument('--log_limit', action='store', type=float, default=0.5, help='Log limit')
     args = parser.parse_args()
     for index, file in enumerate(args.cs):
         cs_names[index] = file
