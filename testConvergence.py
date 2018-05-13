@@ -41,6 +41,7 @@ def check_tfa_convergence(tfa_mats, in_a_row=3, log_limit=0.1):
                 return True, i+1
     return False, -1
 
+
 def main():
     cs_matricies = list()
     cs_names = dict()
@@ -134,13 +135,22 @@ def main():
     
     for index, other_matricies in enumerate(geneexpr_convergences):
         print('{0}-th matrix from {1} converged to same solution as: '.format(geneexpr_convergence_points[index],
-                                                                              '{0}*{1}'.format(cs_names[index], tfa_names[index]), end=''), end='')
+                                                                              '{0}*{1}'.format(cs_names[index], tfa_names[index])), end='')
         print(' '.join(
             ['{0}-th matrix from {1}'.format(geneexpr_convergence_points[x], '{0}*{1}'.format(cs_names[index], tfa_names[index])) for x in other_matricies]))
 
     if args.std_dev:
-        final_iter_matricies = [g[-1] for g in geneexpr_matricies]
-        writeMatrixToFile(np.nanstd(np.array(final_iter_matricies), axis=0), args.std_dev) # clever hack to form a matrix of std. devs of each parameter
+        final_iter_matricies = [g[geneexpr_convergence_points[idx]] for idx,g in enumerate(geneexpr_matricies)]
+        M = np.nanstd(np.array(final_iter_matricies), axis=0) # clever hack to form a matrix of std. devs of each parameter
+        outfile = open(args.std_dev, "w")
+        for row in M:
+            toSave = str(row[0])
+            for valIndex in range(1, len(row)):
+                toSave += "," + str(row[valIndex])
+            toSave += "\n"
+            outfile.write(toSave)
+        outfile.close()
+
 
 if __name__ == '__main__':
     main()
