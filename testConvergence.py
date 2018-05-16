@@ -57,7 +57,7 @@ def main():
     parser.add_argument('--variances', '-v', type=str, nargs='+', help='List of variance explained files', required=True)
     parser.add_argument('--iterations', '-i', type=int, action='store', default=100, help='Number of iterations in log files')
     parser.add_argument('--breaks', '-b', type=int, action='store', default=20, help='Number of iterations to consider at a time')
-    parser.add_argument('--std_dev', action='store', type=str, help='Calculate standard deviations matrix for final iterations and write to file')
+    parser.add_argument('--std_dev', action='store', type=str, help='Calculate standard deviations matrix for final iterations and write to file (file base name is argument)')
     parser.add_argument('--log_limit', action='store', type=float, default=0.5, help='Log limit')
     args = parser.parse_args()
     for index, file in enumerate(args.cs):
@@ -142,7 +142,64 @@ def main():
     if args.std_dev:
         final_iter_matricies = [g[geneexpr_convergence_points[idx]] for idx,g in enumerate(geneexpr_matricies)]
         M = np.nanstd(np.array(final_iter_matricies), axis=0) # clever hack to form a matrix of std. devs of each parameter
-        outfile = open(args.std_dev, "w")
+        outfile = open(args.std_dev + "_geneexpr.out", "w")
+        for row in M:
+            toSave = str(row[0])
+            for valIndex in range(1, len(row)):
+                toSave += "," + str(row[valIndex])
+            toSave += "\n"
+            outfile.write(toSave)
+        outfile.close()
+
+        M = np.nanmean(np.array(final_iter_matricies),
+                      axis=0)  # clever hack to form a matrix of std. devs of each parameter
+        outfile = open(args.std_dev + "_geneexpr_avg.out", "w")
+        for row in M:
+            toSave = str(row[0])
+            for valIndex in range(1, len(row)):
+                toSave += "," + str(row[valIndex])
+            toSave += "\n"
+            outfile.write(toSave)
+        outfile.close()
+
+        final_iter_matricies = [g[cs_convergence_points[idx]] for idx, g in enumerate(cs_matricies)]
+        M = np.nanstd(np.array(final_iter_matricies),
+                      axis=0)  # clever hack to form a matrix of std. devs of each parameter
+        outfile = open(args.std_dev + "_cs.out", "w")
+        for row in M:
+            toSave = str(row[0])
+            for valIndex in range(1, len(row)):
+                toSave += "," + str(row[valIndex])
+            toSave += "\n"
+            outfile.write(toSave)
+        outfile.close()
+
+        M = np.nanmean(np.array(final_iter_matricies),
+                       axis=0)  # clever hack to form a matrix of std. devs of each parameter
+        outfile = open(args.std_dev + "_cs_avg.out", "w")
+        for row in M:
+            toSave = str(row[0])
+            for valIndex in range(1, len(row)):
+                toSave += "," + str(row[valIndex])
+            toSave += "\n"
+            outfile.write(toSave)
+        outfile.close()
+
+        final_iter_matricies = [g[tfa_convergence_points[idx]] for idx, g in enumerate(tfa_matricies)]
+        M = np.nanstd(np.array(final_iter_matricies),
+                      axis=0)  # clever hack to form a matrix of std. devs of each parameter
+        outfile = open(args.std_dev + "_tfa.out", "w")
+        for row in M:
+            toSave = str(row[0])
+            for valIndex in range(1, len(row)):
+                toSave += "," + str(row[valIndex])
+            toSave += "\n"
+            outfile.write(toSave)
+        outfile.close()
+
+        M = np.nanmean(np.array(final_iter_matricies),
+                       axis=0)  # clever hack to form a matrix of std. devs of each parameter
+        outfile = open(args.std_dev + "_tfa_avg.out", "w")
         for row in M:
             toSave = str(row[0])
             for valIndex in range(1, len(row)):
